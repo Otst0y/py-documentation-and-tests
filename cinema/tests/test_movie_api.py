@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 
 from cinema.models import Movie, MovieSession, CinemaHall, Genre, Actor
+from cinema.views import MovieViewSet
 
 MOVIE_URL = reverse("cinema:movie-list")
 MOVIE_SESSION_URL = reverse("cinema:moviesession-list")
@@ -157,3 +158,51 @@ class MovieImageUploadTests(TestCase):
         res = self.client.get(MOVIE_SESSION_URL)
 
         self.assertIn("movie_image", res.data[0].keys())
+
+
+class MovieViewSetTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        action = Genre.objects.create(name="Action")
+        crime = Genre.objects.create(name="Crime")
+
+        actor1 = Actor.objects.create(first_name="Leonardo", last_name="DiCaprio")
+        actor2 = Actor.objects.create(first_name="Elliot", last_name="Page")
+
+        self.movie1 = Movie.objects.create(title="Inception", description="test", duration="12")
+        self.movie2 = Movie.objects.create(title="Looper", description="test", duration="123")
+
+        self.movie1.genres.set([action, crime])
+        self.movie1.actors.set([actor1])
+
+        self.movie2.genres.set([action])
+        self.movie2.actors.set([actor2])
+
+        self.user = get_user_model().objects.create_user(
+            email="admin@admin.com",
+            password="admin1111",
+            is_staff=True
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_params_to_int(self):
+        res = MovieViewSet._params_to_ints("1,2")
+        self.assertEqual(res, [1, 2])
+
+    def test_filter_movies_by_title(self):
+        res = self.client.get("/api/cinema/movies/", {"title": "Inc"})
+
+        self.assertEqual(res.data[0]["title"], "Inception")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_filter_movies_by_genres_ids(self):
+        res = self.client.get("/api/cinema/movies/", {"genres": "2"})
+
+        self.assertEqual(res.data[0]["title"], "Inception")
+
+    def test_filter_movies_by_actors_ids(self):
+        res = self.client.get("/api/cinema/movies/", {"actors": "2"})
+
+        self.assertEqual(res.data[0]["title"], "Looper")
+
