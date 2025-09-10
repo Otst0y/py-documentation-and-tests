@@ -206,3 +206,54 @@ class MovieViewSetTests(TestCase):
 
         self.assertEqual(res.data[0]["title"], "Looper")
 
+
+class PublicMovieViewSetTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.movie = Movie.objects.create(title="Movie", description="test", duration=12)
+
+    def test_auth_required_movies(self):
+        res = self.client.get("/api/cinema/movies/")
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_auth_required_creat_movie(self):
+        url = reverse("cinema:movie-list")
+        payload = {
+            "title": "Movie",
+            "description": "test",
+            "duration": "12"
+        }
+        res = self.client.post(url, payload)
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_auth_required_upload_image(self):
+        url = reverse("cinema:movie-upload-image", args=[self.movie.id])
+
+        payload = {
+            "image": "image.png"
+        }
+        res = self.client.post(url, payload)
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class UserMovieViewSetTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        self.movie = Movie.objects.create(title="Movie", description="test", duration=12)
+
+        self.user = get_user_model().objects.create_user(
+            email="admin@admin.com",
+            password="admin1111",
+            is_staff=False
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_is_staff_required_upload_image(self):
+        url = reverse("cinema:movie-upload-image", args=[self.movie.id])
+
+        payload = {
+            "image": "image.png"
+        }
+        res = self.client.post(url, payload)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
